@@ -9,90 +9,49 @@
       padding: 20px;
       text-align: center;
       background-color: #f9f9f9;
+      margin: 0;
     }
-
     table {
       width: 100%;
       max-width: 500px;
       margin: auto;
       border-collapse: collapse;
     }
-
     th, td {
       padding: 10px;
       border-bottom: 1px solid #ddd;
       text-align: left;
     }
-
-    th {
-      background: #f4f4f4;
-    }
-
-    .center {
-      text-align: center;
-    }
+    th { background: #f4f4f4; }
+    .center { text-align: center; }
 
     .toggle {
-      width: 40px;
-      height: 20px;
-      border-radius: 20px;
-      background-color: #ccc;
-      position: relative;
-      cursor: pointer;
-      display: inline-block;
-      transition: background-color 0.3s ease;
+      width: 40px; height: 20px; border-radius: 20px;
+      background-color: #ccc; position: relative; cursor: pointer;
+      display: inline-block; transition: background-color .3s ease;
     }
-
     .toggle::before {
-      content: "";
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      left: 1px;
-      top: 1px;
-      background-color: white;
-      border-radius: 50%;
-      transition: transform 0.3s ease;
+      content: ""; position: absolute; width: 18px; height: 18px; left: 1px; top: 1px;
+      background-color: white; border-radius: 50%; transition: transform .3s ease;
     }
-
-    .toggle.on {
-      background-color: #333;
-    }
-
-    .toggle.on::before {
-      transform: translateX(20px);
-    }
+    .toggle.on { background-color: #333; }
+    .toggle.on::before { transform: translateX(20px); }
 
     button {
-      padding: 10px 15px;
-      margin: 10px;
-      font-size: 16px;
-      border: none;
-      background-color: #4CAF50;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
+      padding: 10px 15px; margin: 10px; font-size: 16px; border: none;
+      background-color: #4CAF50; color: white; border-radius: 5px; cursor: pointer;
     }
-
     input[type="text"] {
-      padding: 10px;
-      width: 300px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+      padding: 10px; width: 300px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px;
     }
-
-    .logout-btn {
-      background-color: #dc3545;
-    }
-
+    .logout-btn { background-color: #dc3545; }
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin: 0 auto 20px;
-      max-width: 500px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin: 0 auto 20px; max-width: 720px;
     }
+    .header-right { display:flex; align-items:center; gap:14px; }
+    .mute-wrap { display:flex; align-items:center; gap:8px; font-size:14px; color:#333; }
+    .badge { padding:4px 8px; border-radius: 999px; background:#eef3ff; color:#224; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -103,17 +62,21 @@
       <span style="font:800 1.25rem/1.1 Inter, system-ui, sans-serif;">BuddyCart</span>
     </a>
   </div>
-  <div id="site-header"></div>
-  <script>
-    fetch("header.html")
-      .then(r => r.text())
-      .then(h => { document.getElementById("site-header").innerHTML = h; });
-  </script>
 
   <div class="header">
     <h2 id="welcome-text">Welcome back</h2>
-    <button class="logout-btn" onclick="logout()">Logout</button>
+    <div class="header-right">
+      <span id="room-name" class="badge">Room</span>
+      <label class="mute-wrap" title="Mute notification sound">
+        <input id="muteSwitch" type="checkbox"> Mute
+      </label>
+      <button id="testDingBtn" type="button">Test sound</button>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
   </div>
+
+  <!-- Optional nicer ding; fallback beep used if this file is missing -->
+  <audio id="ding" src="assets/ding.mp3" preload="auto"></audio>
 
   <div id="app" style="display:none;">
     <input type="text" id="itemInput" placeholder="Type items separated by commas" size="40"/>
@@ -143,16 +106,80 @@
       measurementId: "G-SZW4G9WVHD"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
+    // --- App state ---
+    const MUTE_KEY = 'buddycart_mute_v1';
+    let isMuted = localStorage.getItem(MUTE_KEY) === '1';
     let roomId = localStorage.getItem("activeRoomId");
     let currentUserId = "", currentUserName = "";
 
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- Autoplay unlock: enable audio after first user interaction ---
+    const unlockAudio = () => {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const ctx = playDing._ctx || new Ctx();
+        playDing._ctx = ctx;
+        if (ctx.state === 'suspended') ctx.resume();
+        const a = document.getElementById('ding');
+        if (a) {
+          a.volume = 0.0001;
+          a.play().then(() => { a.pause(); a.currentTime = 0; a.volume = 1; }).catch(()=>{});
+        }
+      } catch(e) {}
+    };
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('touchstart', unlockAudio, { once: true });
+
+    // --- Sound helpers ---
+    function playDing(){
+      if (isMuted) return;
+      const a = document.getElementById('ding');
+      if (a) {
+        a.currentTime = 0;
+        a.play().catch(() => fallbackBeep());
+      } else {
+        fallbackBeep();
+      }
+    }
+    function fallbackBeep() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const ctx = playDing._ctx || new Ctx();
+        playDing._ctx = ctx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.2, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } catch(e) {}
+    }
+
+    // --- Auth + init ---
     firebase.auth().onAuthStateChanged(user => {
       if (!user) return location.href = "login.html";
       currentUserId = user.uid;
       const email = user.email;
+
+      // Mute UI
+      const muteSwitch = document.getElementById('muteSwitch');
+      muteSwitch.checked = isMuted;
+      muteSwitch.addEventListener('change', () => {
+        isMuted = muteSwitch.checked;
+        localStorage.setItem(MUTE_KEY, isMuted ? '1' : '0');
+      });
+
+      // Test sound
+      document.getElementById('testDingBtn').addEventListener('click', () => playDing());
+
       db.ref(`users/${currentUserId}`).once('value').then(userSnap => {
         const userData = userSnap.val();
         currentUserName = userData?.displayName || email.split("@")[0];
@@ -166,7 +193,10 @@
 
           document.getElementById("app").style.display = "block";
           db.ref(`rooms/${roomId}/name`).once('value').then(nameSnap => {
-            document.title = nameSnap.val();
+            const rn = nameSnap.val() || 'Room';
+            document.title = rn;
+            const rnEl = document.getElementById('room-name');
+            if (rnEl) rnEl.textContent = rn;
           });
           listen();
         });
@@ -178,9 +208,36 @@
     }
 
     function listen() {
-      db.ref(`rooms/${roomId}/items`).on('value', snap => {
-        const data = snap.val() || {};
-        updateTable(data);
+      const itemsRef = db.ref(`rooms/${roomId}/items`);
+      const pickedState = {}; // id -> boolean
+
+      // Seed cache
+      itemsRef.once('value').then(snap => {
+        const items = snap.val() || {};
+        for (const [id, itm] of Object.entries(items)) {
+          pickedState[id] = !!itm.picked;
+        }
+      });
+
+      // Live updates
+      itemsRef.on('value', snap => {
+        const items = snap.val() || {};
+        updateTable(items);
+
+        for (const [id, itm] of Object.entries(items)) {
+          const prev = pickedState[id];
+          const now = !!itm.picked;
+
+          // false -> true and not toggled by me => ding
+          if (prev !== undefined && prev === false && now === true) {
+            if (!itm.who || itm.who !== currentUserName) {
+              playDing();
+            }
+            // For testing (ding even on your own toggles), use this instead:
+            // playDing();
+          }
+          pickedState[id] = now;
+        }
       });
     }
 
@@ -235,12 +292,5 @@
       });
     }
   </script>
-<div id="site-header"></div>
-<script>
-  fetch("header.html")
-    .then(r => r.text())
-    .then(h => { document.getElementById("site-header").innerHTML = h; });
-</script>
-
 </body>
 </html>
