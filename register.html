@@ -59,7 +59,13 @@
   </style>
 </head>
 <body>
-
+  <!-- BuddyCart header -->
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#0b1020ee;border-bottom:1px solid #263257;position:sticky;top:0;z-index:1000;backdrop-filter:blur(6px);">
+    <a href="dashboard.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#eaf2ff;">
+      <img src="assets/buddycart-logo.png" alt="BuddyCart logo" style="height:44px;width:auto;display:block;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35));">
+      <span style="font:800 1.25rem/1.1 Inter, system-ui, sans-serif;">BuddyCart</span>
+    </a>
+  </div>
   <div class="container">
     <h2>Register</h2>
     <input type="email" id="register-email" placeholder="Email" required />
@@ -144,6 +150,12 @@
         });
     }
   </script>
+<div id="site-header"></div>
+<script>
+  fetch("header.html")
+    .then(r => r.text())
+    .then(h => { document.getElementById("site-header").innerHTML = h; });
+</script>
 
 </body>
 </html>
